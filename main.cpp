@@ -118,12 +118,20 @@ int main() {
     vector<int> *pids = new vector<int>;
     int *status = new int;
     while (true) {
+        cerr << pids->size() << endl;
         for (int i = 0; i < pids->size(); i++) {
             cerr << "pid" << i << endl;
-            waitpid(pids->at(i), status, WNOHANG);
-            if(WIFSTOPPED(*status)){
-                pids->erase(pids->begin()+i);
-                cerr << "Sleep Exited" << endl;
+            int id = waitpid(pids->at(i), status, WNOHANG);
+            if(id == -1){
+                cerr << "error occured" << endl;
+            }
+            else if(id == 0){
+                //cerr << "Child " << i << " is still running" << endl;
+            }
+            else{
+                //cerr << "Child " << i << " has exited" << endl;
+                pids->erase(pids->begin() + i);
+                i--;
             }
         }
         //cerr << "After pids" << endl;
