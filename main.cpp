@@ -10,21 +10,21 @@
 
 using namespace std;
 
-string* removeChars(string s, string chars) {
+string *removeChars(string s, string chars) {
     //removes characters in chars from s that aren't in quotes
-    string* removed = new string;
+    string *removed = new string;
     bool inQuotes = false;
     for (int i = 0; i < s.length(); i++) {
         bool add = true;
-        if(s.at(i) == '\"' | s.at(i) == '\''){
+        if (s.at(i) == '\"' | s.at(i) == '\'') {
             inQuotes = !inQuotes;
         }
         for (int j = 0; j < chars.length(); j++) {
-            if(chars.at(j) == s.at(i) && !inQuotes){
+            if (chars.at(j) == s.at(i) && !inQuotes) {
                 add = false;
             }
         }
-        if(add){
+        if (add) {
             removed->push_back(s.at(i));
         }
     }
@@ -59,10 +59,12 @@ vector<string> *split(string line, string splitChars) {
 }
 
 char **getArguments(string line) {
+    //cerr << "start" << endl;
     vector<string> *seperated = split(line, " ");
     char **args = new char *[seperated->size() + 1];
     for (int i = 0; i < seperated->size(); i++) {
-        string* trimed = removeChars(seperated->at(i), " \"\'"); //removes spaces and quotes
+        string *trimed = removeChars(seperated->at(i), " \"\'"); //removes spaces and quotes
+        //cerr << *trimed << endl;
         args[i] = (char *) trimed->c_str();
     }
     args[seperated->size()] = NULL;
@@ -73,6 +75,7 @@ char **getArguments(string line) {
 
 
 void execute(string function) {
+    //cerr << "execute" << endl;
     char **args = getArguments(function);
     execvp(args[0], args);
     cout << "Error " << args[0] << " not found" << endl;
@@ -80,8 +83,9 @@ void execute(string function) {
 }
 
 void outputRedirection(string command, string file) {
-
-    if(!fork()) {
+    int *status;
+    int id = fork();
+    if (!id) {
         int output = open(file.c_str(), O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
         dup2(output, 1);
         close(output);
@@ -89,11 +93,13 @@ void outputRedirection(string command, string file) {
         cerr << "ERROR execute failed" << endl;
         exit(0);
     }
-    wait(0);
+    waitpid(id, status, 0);
 }
 
 void inputRedirection(string command, string file) {
-    if(!fork()) {
+    int id = fork();
+    int *status;
+    if (!id) {
         int input = open((char *) file.c_str(), O_RDONLY);
         dup2(input, 0);
         close(input);
@@ -101,17 +107,36 @@ void inputRedirection(string command, string file) {
         cerr << "ERROR execute failed" << endl;
         exit(0);
     }
-    wait(0);
+    waitpid(id, status, 0);
+}
+
+void checkRedirectionA() {
+    //checks for redirection and for & to determine if to run in background or not
 }
 
 int main() {
-    vector<string>* test = split("ls -a", " ");
+    vector<int> *pids = new vector<int>;
+    int *status = new int;
     while (true) {
+        for (int i = 0; i < pids->size(); i++) {
+            cerr << "pid" << i << endl;
+            waitpid(pids->at(i), status, WNOHANG);
+            if(WIFSTOPPED(*status)){
+                pids->erase(pids->begin()+i);
+                cerr << "Sleep Exited" << endl;
+            }
+        }
+        //cerr << "After pids" << endl;
         cout << "My Shell$ ";
         //fflush(stdout);
         string inputline;
         getline(cin, inputline);
         //cout << "Input Line: " << inputline << endl;
+
+        if (inputline == string("exit")) {
+            cout << "Bye!! End of shell" << endl;
+            break;
+        }
 
         vector<string> *pipes = split(inputline, "|");
         if (pipes->size() > 1) {
@@ -119,7 +144,8 @@ int main() {
             for (int i = 0; i < pipes->size(); i++) {
                 int fd[2];
                 pipe(fd);
-                if (!fork()) {
+                int id = fork();
+                if (!id) {
                     if (i < pipes->size() - 1) {
                         //cout << "PIPES " << pipes->at(i) << endl;
                         dup2(fd[1], 1);
@@ -127,7 +153,7 @@ int main() {
                     }
                     execute(pipes->at(i));
                 } else {
-                    wait(0);
+                    waitpid(id, status, 0);
                     dup2(fd[0], 0);
                     close(fd[1]);
                 }
@@ -135,6 +161,7 @@ int main() {
             dup2(standIn, 0);
             close(standIn);
         } else {
+            //cerr << "after input" << endl;
             vector<string> *redirect = split(inputline, "<");
             if (redirect->size() == 2) {
                 inputRedirection(redirect->at(0), *removeChars(redirect->at(1), " ")); //removes spaces from file name
@@ -148,17 +175,22 @@ int main() {
                 continue;
             }
             delete redirect;
-            if (inputline == string("exit")) {
-                cout << "Bye!! End of shell" << endl;
-                break;
-            }
+
 
             int pid = fork();
             if (pid == 0) {
                 execute(inputline);
             } else {
-                wait(0);
+                waitpid(pid, status, 0);
             }
+        }
+
+        int id = fork();
+        if(!id){
+            execute("sleep 5");
+        }
+        else{
+            pids->push_back(id);
         }
         //cout << "Pipes done" << endl;
         pipes->clear();
