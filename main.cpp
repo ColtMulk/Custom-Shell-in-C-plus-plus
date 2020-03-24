@@ -20,7 +20,7 @@ string *removeChars(string s, string chars) {
             inQuotes = !inQuotes;
         }
         for (int j = 0; j < chars.length(); j++) {
-            if (chars.at(j) == s.at(i) && !inQuotes) {
+            if (chars.at(j) == s.at(i) && (!inQuotes || chars.at(j) == '\'' || chars.at(j) == '\"')) {
                 add = false;
             }
         }
@@ -197,6 +197,10 @@ int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, 
     }
 }
 
+void changeDirectory(string command){
+    vector<string>* seperated = split(command, " ");
+}
+
 int main() {
     vector<int> *pids = new vector<int>;
     int *status = new int;
@@ -259,6 +263,9 @@ int main() {
             dup2(standIn, 0);
             close(standIn);
         } else {
+            if(inputline.substr(0,2) == "cd"){
+                changeDirectory(inputline);
+            }
             //executes line with special arguments
             executeWRedirectAnd(inputline, pids);
         }
