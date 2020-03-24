@@ -197,11 +197,31 @@ int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, 
     }
 }
 
-void changeDirectory(string command){
+string changeDirectory(string command, string previousPath){
     vector<string>* seperated = split(command, " ");
+    if(seperated->size() >= 2){
+        string* temp = removeChars(seperated->at(1), "\"\'");
+        if(*temp == "-"){
+            return previousPath;
+        }
+        else if(chdir(temp->c_str()) != 0){
+            cerr << "chdir() failed" << endl;
+        }
+    }
+    else{
+        cout << "Command cd needs arguments" << endl;
+    }
+
+    char* s = new char[1000];
+
+    return getcwd(s,1000);
 }
 
 int main() {
+    char s[1000];
+    string path = getcwd(s,1000);
+    string previousP = path;
+
     vector<int> *pids = new vector<int>;
     int *status = new int;
     while (true) {
@@ -220,7 +240,7 @@ int main() {
             }
         }
         //cerr << "After pids" << endl;
-        cout << "My Shell$ ";
+        cout << "My Shell" << path << "$ ";
         //fflush(stdout);
         string inputline;
         getline(cin, inputline);
@@ -263,11 +283,24 @@ int main() {
             dup2(standIn, 0);
             close(standIn);
         } else {
+            //cout << inputline.substr(0,2) << endl;
             if(inputline.substr(0,2) == "cd"){
-                changeDirectory(inputline);
+                string temp = path;
+                path = changeDirectory(inputline, previousP);
+                //changes previousPath if path was changed
+                if(temp != path) {
+                    previousP = temp;
+                }
             }
-            //executes line with special arguments
-            executeWRedirectAnd(inputline, pids);
+            else if(inputline.substr(0,4) == "jobs"){
+                for (int i = 0; i < pids->size(); i++) {
+                    cout << "PID: " << pids->at(i) << " is currently running" << endl;
+                }
+            }
+            else{
+                //executes line with special arguments
+                executeWRedirectAnd(inputline, pids);
+            }
         }
 
         /*int id = fork();
