@@ -110,17 +110,98 @@ void inputRedirection(string command, string file) {
     waitpid(id, status, 0);
 }
 
-void checkRedirectionA() {
+int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, bool pipeEnd = false) {
     //checks for redirection and for & to determine if to run in background or not
+    vector<string> *seperated = split(line, " ");
+    bool inputR = false, outputR = false, a = false;
+    string input, output;
+    //gets special arguments from line
+    //doesn't allow certain arguments for pipe start or pipe end
+    //creates command string that doesn't include the special arguments
+    string command;
+    for(int i = 0; i < seperated->size(); i++){
+
+        if(seperated->at(i) == "<" && !pipeEnd){
+            // input redirection
+            inputR = true;
+
+            //goes to argument for input
+            i++;
+
+            //checks if out of range of vector and exits if so
+            if(seperated->size() <= i){
+                cerr << "< needs an argument" << endl;
+                return -1;
+            }
+
+            //gets input file
+            input = seperated->at(i);
+        }
+        else if(seperated->at(i) == ">" && !pipeStart){
+            //output redirection
+            outputR = true;
+
+            //goes to argument for output
+            i++;
+
+            //checks if out of range of vector and exits if so
+            if(seperated->size() <= i){
+                cerr << "> needs an argument" << endl;
+                return -1;
+            }
+
+            //gets output file
+            output = seperated->at(i);
+        }
+        else if(seperated->at(i) == "&" && !pipeStart && !pipeEnd){
+            //Background Proccess
+            a = true;
+            seperated->erase(seperated->begin()+i);
+            i--;
+        }
+        else{
+            command += seperated->at(i) + " ";
+        }
+    }
+    //removes extra space
+    command = command.substr(0,command.length()-1);
+
+    int id = fork();
+    if(!id){
+        //does input redirection
+        if(inputR){
+            int in = open((char*) input.c_str(), O_RDONLY);
+            dup2(in, 0);
+            close(in);
+        }
+        //does output redirection
+        if(outputR){
+            int out = open((char*) output.c_str(), O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+            dup2(out, 1);
+            close(out);
+        }
+
+        //executes command
+        execute(command);
+        cerr << "Command failed to execute" << endl;
+        exit(1);
+    }
+    else{
+        //handles & option
+        if(!a){
+            waitpid(id, nullptr, 0);
+        }
+        else{
+            pids->push_back(id);
+        }
+    }
 }
 
 int main() {
     vector<int> *pids = new vector<int>;
     int *status = new int;
     while (true) {
-        cerr << pids->size() << endl;
         for (int i = 0; i < pids->size(); i++) {
-            cerr << "pid" << i << endl;
             int id = waitpid(pids->at(i), status, WNOHANG);
             if(id == -1){
                 cerr << "error occured" << endl;
@@ -159,6 +240,15 @@ int main() {
                         dup2(fd[1], 1);
                         close(fd[1]);
                     }
+
+                    if(i == 0){
+                        executeWRedirectAnd(pipes->at(i), pids, true);
+                        exit(0);
+                    }
+                    else if(i == pipes->size()-1){
+                        executeWRedirectAnd(pipes->at(i), pids, false, true);
+                        exit(0);
+                    }
                     execute(pipes->at(i));
                 } else {
                     waitpid(id, status, 0);
@@ -169,37 +259,17 @@ int main() {
             dup2(standIn, 0);
             close(standIn);
         } else {
-            //cerr << "after input" << endl;
-            vector<string> *redirect = split(inputline, "<");
-            if (redirect->size() == 2) {
-                inputRedirection(redirect->at(0), *removeChars(redirect->at(1), " ")); //removes spaces from file name
-                delete redirect;
-                continue;
-            }
-            redirect = split(inputline, ">");
-            if (redirect->size() == 2) {
-                outputRedirection(redirect->at(0), *removeChars(redirect->at(1), " "));
-                delete redirect;
-                continue;
-            }
-            delete redirect;
-
-
-            int pid = fork();
-            if (pid == 0) {
-                execute(inputline);
-            } else {
-                waitpid(pid, status, 0);
-            }
+            //executes line with special arguments
+            executeWRedirectAnd(inputline, pids);
         }
 
-        int id = fork();
+        /*int id = fork();
         if(!id){
             execute("sleep 5");
         }
         else{
             pids->push_back(id);
-        }
+        }*/
         //cout << "Pipes done" << endl;
         pipes->clear();
 
