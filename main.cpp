@@ -59,7 +59,7 @@ vector<string> *split(string line, string splitChars) {
 }
 
 char **getArguments(string line) {
-    //cerr << "start" << endl;
+    //gets the arguments seperated by space
     vector<string> *seperated = split(line, " ");
     char **args = new char *[seperated->size() + 1];
     for (int i = 0; i < seperated->size(); i++) {
@@ -75,39 +75,11 @@ char **getArguments(string line) {
 
 
 void execute(string function) {
-    //cerr << "execute" << endl;
+    //executes a command (no special arguments)
     char **args = getArguments(function);
     execvp(args[0], args);
     cout << "Error " << args[0] << " not found" << endl;
     exit(0);
-}
-
-void outputRedirection(string command, string file) {
-    int *status;
-    int id = fork();
-    if (!id) {
-        int output = open(file.c_str(), O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
-        dup2(output, 1);
-        close(output);
-        execute(command);
-        cerr << "ERROR execute failed" << endl;
-        exit(0);
-    }
-    waitpid(id, status, 0);
-}
-
-void inputRedirection(string command, string file) {
-    int id = fork();
-    int *status;
-    if (!id) {
-        int input = open((char *) file.c_str(), O_RDONLY);
-        dup2(input, 0);
-        close(input);
-        execute(command);
-        cerr << "ERROR execute failed" << endl;
-        exit(0);
-    }
-    waitpid(id, status, 0);
 }
 
 int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, bool pipeEnd = false) {
@@ -119,9 +91,9 @@ int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, 
     //doesn't allow certain arguments for pipe start or pipe end
     //creates command string that doesn't include the special arguments
     string command;
-    for(int i = 0; i < seperated->size(); i++){
+    for (int i = 0; i < seperated->size(); i++) {
 
-        if(seperated->at(i) == "<" && !pipeEnd){
+        if (seperated->at(i) == "<" && !pipeEnd) {
             // input redirection
             inputR = true;
 
@@ -129,15 +101,14 @@ int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, 
             i++;
 
             //checks if out of range of vector and exits if so
-            if(seperated->size() <= i){
+            if (seperated->size() <= i) {
                 cerr << "< needs an argument" << endl;
                 return -1;
             }
 
             //gets input file
             input = seperated->at(i);
-        }
-        else if(seperated->at(i) == ">" && !pipeStart){
+        } else if (seperated->at(i) == ">" && !pipeStart) {
             //output redirection
             outputR = true;
 
@@ -145,38 +116,37 @@ int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, 
             i++;
 
             //checks if out of range of vector and exits if so
-            if(seperated->size() <= i){
+            if (seperated->size() <= i) {
                 cerr << "> needs an argument" << endl;
                 return -1;
             }
 
             //gets output file
             output = seperated->at(i);
-        }
-        else if(seperated->at(i) == "&" && !pipeStart && !pipeEnd){
+        } else if (seperated->at(i) == "&" && !pipeStart && !pipeEnd) {
             //Background Proccess
             a = true;
-            seperated->erase(seperated->begin()+i);
+            seperated->erase(seperated->begin() + i);
             i--;
-        }
-        else{
+        } else {
             command += seperated->at(i) + " ";
         }
     }
     //removes extra space
-    command = command.substr(0,command.length()-1);
+    command = command.substr(0, command.length() - 1);
 
     int id = fork();
-    if(!id){
+    if (!id) {
         //does input redirection
-        if(inputR){
-            int in = open((char*) input.c_str(), O_RDONLY);
+        if (inputR) {
+            int in = open((char *) input.c_str(), O_RDONLY);
             dup2(in, 0);
             close(in);
         }
         //does output redirection
-        if(outputR){
-            int out = open((char*) output.c_str(), O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+        if (outputR) {
+            int out = open((char *) output.c_str(), O_WRONLY | O_TRUNC | O_CREAT,
+                           S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
             dup2(out, 1);
             close(out);
         }
@@ -185,55 +155,53 @@ int executeWRedirectAnd(string line, vector<int> *pids, bool pipeStart = false, 
         execute(command);
         cerr << "Command failed to execute" << endl;
         exit(1);
-    }
-    else{
+    } else {
         //handles & option
-        if(!a){
+        if (!a) {
             waitpid(id, nullptr, 0);
-        }
-        else{
+        } else {
             pids->push_back(id);
         }
     }
 }
 
-string changeDirectory(string command, string previousPath){
-    vector<string>* seperated = split(command, " ");
-    if(seperated->size() >= 2){
-        string* temp = removeChars(seperated->at(1), "\"\'");
-        if(*temp == "-"){
+string changeDirectory(string command, string previousPath) {
+    //changes the current dirrectory and then returns the new path (returns same path if error occurs)
+    vector<string> *seperated = split(command, " ");
+    if (seperated->size() >= 2) {
+        string *temp = removeChars(seperated->at(1), "\"\'");
+        if (*temp == "-") {
+            //returns the previousPath
             return previousPath;
-        }
-        else if(chdir(temp->c_str()) != 0){
+        } else if (chdir(temp->c_str()) != 0) {
             cerr << "chdir() failed" << endl;
         }
-    }
-    else{
+    } else {
         cout << "Command cd needs arguments" << endl;
     }
 
-    char* s = new char[1000];
+    char *s = new char[1000];
 
-    return getcwd(s,1000);
+    return getcwd(s, 1000);
 }
 
 int main() {
     char s[1000];
-    string path = getcwd(s,1000);
+    string path = getcwd(s, 1000);
     string previousP = path;
 
     vector<int> *pids = new vector<int>;
     int *status = new int;
     while (true) {
+
+        //loops through active processes and closes the ones that are done
         for (int i = 0; i < pids->size(); i++) {
             int id = waitpid(pids->at(i), status, WNOHANG);
-            if(id == -1){
+            if (id == -1) {
                 cerr << "error occured" << endl;
-            }
-            else if(id == 0){
+            } else if (id == 0) {
                 //cerr << "Child " << i << " is still running" << endl;
-            }
-            else{
+            } else {
                 //cerr << "Child " << i << " has exited" << endl;
                 pids->erase(pids->begin() + i);
                 i--;
@@ -251,6 +219,7 @@ int main() {
             break;
         }
 
+        //checks for pipes
         vector<string> *pipes = split(inputline, "|");
         if (pipes->size() > 1) {
             int standIn = dup(0);
@@ -265,11 +234,10 @@ int main() {
                         close(fd[1]);
                     }
 
-                    if(i == 0){
+                    if (i == 0) {
                         executeWRedirectAnd(pipes->at(i), pids, true);
                         exit(0);
-                    }
-                    else if(i == pipes->size()-1){
+                    } else if (i == pipes->size() - 1) {
                         executeWRedirectAnd(pipes->at(i), pids, false, true);
                         exit(0);
                     }
@@ -283,34 +251,25 @@ int main() {
             dup2(standIn, 0);
             close(standIn);
         } else {
-            //cout << inputline.substr(0,2) << endl;
-            if(inputline.substr(0,2) == "cd"){
+            //does custom cd command
+            if (inputline.substr(0, 2) == "cd") {
                 string temp = path;
                 path = changeDirectory(inputline, previousP);
                 //changes previousPath if path was changed
-                if(temp != path) {
+                if (temp != path) {
                     previousP = temp;
                 }
-            }
-            else if(inputline.substr(0,4) == "jobs"){
+            } else if (inputline.substr(0, 4) == "jobs") {
+                //executes jobs command (prints out pids of current proccesses)
                 for (int i = 0; i < pids->size(); i++) {
                     cout << "PID: " << pids->at(i) << " is currently running" << endl;
                 }
-            }
-            else{
+            } else {
                 //executes line with special arguments
                 executeWRedirectAnd(inputline, pids);
             }
         }
 
-        /*int id = fork();
-        if(!id){
-            execute("sleep 5");
-        }
-        else{
-            pids->push_back(id);
-        }*/
-        //cout << "Pipes done" << endl;
         pipes->clear();
 
     }
