@@ -7,8 +7,8 @@ This shell supports redirection and piping
 It also includes a custom cd command to change directires  
 in addition to the normal pathing for cd you can type in  
 
-. for curr directory  
-.. to go back a directory  
-- For previous path
+cd . for curr directory  
+cd .. to go back a directory  
+cd - For previous path
 
 type exit to end the program
